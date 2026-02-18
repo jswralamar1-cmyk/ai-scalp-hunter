@@ -5,6 +5,7 @@ AI Scalp Hunter - Render Compatible Version
 
 import threading
 import logging
+import asyncio
 from flask import Flask, jsonify
 from telegram_ui import TelegramUI
 
@@ -25,6 +26,10 @@ def run_bot():
     global bot_status
     try:
         logger.info("🚀 Starting Telegram Bot in background...")
+        # Create new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
         bot_status["running"] = True
         bot = TelegramUI()
         bot.run()
