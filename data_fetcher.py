@@ -53,7 +53,9 @@ class DataFetcher:
         async with self.semaphore:
             for attempt in range(2):
                 try:
-                    async with session.get(BASE_URL, params=params, timeout=self.timeout) as response:
+                    # Disable brotli compression to avoid aiohttp compatibility issues
+                    headers = {'Accept-Encoding': 'gzip, deflate'}
+                    async with session.get(BASE_URL, params=params, headers=headers, timeout=self.timeout) as response:
                         if response.status != 200:
                             error_text = await response.text()
                             raise Exception(f"HTTP {response.status}: {error_text}")
@@ -77,10 +79,15 @@ class DataFetcher:
                         df["time"] = pd.to_datetime(df["time"])
                         df.set_index("time", inplace=True)
 
-                        numeric_cols = ["open", "high", "low", "close", "volume"]
+                        # Convert numeric columns (forex pairs don't have volume)
+                        numeric_cols = ["open", "high", "low", "close"]
                         for col in numeric_cols:
                             if col in df.columns:
                                 df[col] = pd.to_numeric(df[col], errors="coerce")
+                        
+                        # Handle volume if present (stocks/crypto)
+                        if "volume" in df.columns:
+                            df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
 
                         df = df.sort_index()
                         self._set_cache(symbol, timeframe, df)
