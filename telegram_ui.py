@@ -8,7 +8,7 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from bot_runner import run_scalp_analysis
-from config import TELEGRAM_BOT_TOKEN
+from config import TELEGRAM_TOKEN
 
 # Setup logging
 logging.basicConfig(
@@ -23,7 +23,7 @@ class TelegramUI:
     
     def __init__(self):
         """Initialize bot application"""
-        self.app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+        self.app = Application.builder().token(TELEGRAM_TOKEN).build()
         self._setup_handlers()
         logger.info("TelegramUI initialized (Polling mode)")
     
