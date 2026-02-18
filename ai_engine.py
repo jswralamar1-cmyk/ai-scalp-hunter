@@ -67,8 +67,13 @@ class AIEngine:
             # Parse response
             content = response.choices[0].message.content
             logger.info(f"AI raw response length: {len(content)} chars")
-            logger.debug(f"AI response: {content[:500]}...")  # First 500 chars
+            logger.info(f"AI FULL RESPONSE: {content}")  # Print full response
             parsed = json.loads(content)
+            logger.info(f"AI parsed type: {type(parsed)}")
+            logger.info(f"AI parsed keys: {list(parsed.keys()) if isinstance(parsed, dict) else 'NOT A DICT'}")
+            if isinstance(parsed, dict) and 'top_2' in parsed:
+                logger.info(f"top_2 type: {type(parsed['top_2'])}")
+                logger.info(f"top_2 value: {parsed['top_2']}")
             
             # Validate response structure
             if not isinstance(parsed, dict):
@@ -80,7 +85,8 @@ class AIEngine:
                 return {"error": "Invalid AI response format"}
             
             if not isinstance(parsed["top_2"], list):
-                logger.error("AI 'top_2' is not a list")
+                logger.error(f"AI 'top_2' is not a list, it's: {type(parsed['top_2'])}")
+                logger.error(f"AI 'top_2' content: {parsed['top_2']}")
                 return {"error": "Invalid AI response format"}
             
             # Validate each pick has required fields
