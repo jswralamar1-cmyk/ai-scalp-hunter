@@ -113,10 +113,11 @@ class TelegramUI:
         """
         try:
             # محاولة حذف أي Webhook قد يكون مضبوطًا (آمنة حتى لو لم يكن موجودًا)
+            # لا نغلق الـ event loop لأن run_polling يحتاجه
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             loop.run_until_complete(self.app.bot.delete_webhook(drop_pending_updates=True))
-            loop.close()
+            # DON'T close the loop - run_polling needs it!
             logging.info("✅ تم تنظيف webhook وجلسات getUpdates القديمة.")
         except Exception as e:
             # هذا الخطأ متوقع إذا لم يكن هناك ويب هوك، لذلك نمرره بصمت
