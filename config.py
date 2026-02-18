@@ -17,23 +17,29 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 # ====================================================
-# 💱 الأزواج الحقيقية (Forex + Crypto + Indices)
+# 💱 الأزواج (20 زوج فوركس)
 # ====================================================
 SYMBOLS = [
-    # العملات الرئيسية (Majors)
-    "EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CAD", "USD/CHF", "NZD/USD",
-    
-    # العملات المتقاطعة (Crosses)
-    "EUR/GBP", "EUR/JPY", "GBP/JPY", "AUD/JPY", "NZD/JPY", "EUR/AUD", "GBP/AUD", "CHF/JPY",
-    
-    # المؤشرات العالمية (Indices)
-    "SPX500/USD", "NAS100/USD", "GER40/EUR", "UK100/GBP", "JPN225/JPY",
-    
-    # السلع (Commodities)
-    "XAU/USD", "XAG/USD", "WTI/USD", "BRENT/USD",
-    
-    # العملات الرقمية (Cryptocurrencies)
-    "BTC/USD", "ETH/USD"
+    "GBP/JPY",
+    "USD/JPY",
+    "EUR/JPY",
+    "EUR/USD",
+    "AUD/JPY",
+    "CAD/JPY",
+    "CHF/JPY",
+    "EUR/AUD",
+    "AUD/CHF",
+    "EUR/CAD",
+    "EUR/CHF",
+    "GBP/USD",
+    "USD/CAD",
+    "AUD/CAD",
+    "AUD/USD",
+    "GBP/AUD",
+    "EUR/GBP",
+    "GBP/CAD",
+    "GBP/CHF",
+    "USD/CHF"
 ]
 
 # ====================================================
