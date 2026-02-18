@@ -19,7 +19,7 @@ class AIEngine:
     AI-powered analysis engine using Groq
     - Analyzes top 15 candidates
     - Selects best 2 opportunities
-    - Provides confidence modifiers and reasoning
+    - Provides detailed Arabic analysis based on numerical data
     """
     
     def __init__(self):
@@ -51,14 +51,14 @@ class AIEngine:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are an elite scalping trading analyst with deep expertise in technical analysis and market microstructure."
+                            "content": "أنت محلل سكالبينغ احترافي متخصص بفريم الدقيقة الواحدة. تحلل البيانات الرقمية بدقة وتقدم تحليلاً مخصصاً لكل زوج بناءً على القيم الفعلية."
                         },
                         {
                             "role": "user",
                             "content": prompt
                         }
                     ],
-                    temperature=0.2,
+                    temperature=0.3,
                     response_format={"type": "json_object"}
                 ),
                 timeout=AI_TIMEOUT
@@ -122,11 +122,13 @@ class AIEngine:
                 
                 # Add defaults for missing optional fields
                 pick.setdefault("expiry_minutes", 2)
-                pick.setdefault("pattern_conviction", 0.5)
-                pick.setdefault("momentum_strength", 0.5)
-                pick.setdefault("structure_alignment", False)
-                pick.setdefault("risk_flags", [])
-                pick.setdefault("reasoning", [])
+                pick.setdefault("analysis", {
+                    "market_structure": "غير متوفر",
+                    "momentum": "غير متوفر",
+                    "indicator_confluence": "غير متوفر",
+                    "risk_assessment": "غير متوفر",
+                    "entry_logic": "غير متوفر"
+                })
                 pick.setdefault("confidence_modifier", 0)
                 
                 validated_picks.append(pick)
@@ -151,73 +153,71 @@ class AIEngine:
     
     def _build_prompt(self, top_candidates: List[Dict]) -> str:
         """
-        Build prompt for AI analysis
+        Build professional Arabic prompt for AI analysis
         
         Args:
-            top_candidates: List of candidates
+            top_candidates: List of candidates with numerical data
         
         Returns:
             Formatted prompt string
         """
         return f"""
-You are a professional scalping analyst.
+سيتم تزويدك ببيانات رقمية دقيقة لـ {len(top_candidates)} زوج عملات.
 
-You are given {len(top_candidates)} pre-filtered trading candidates.
-Select ONLY the best 2 opportunities with the highest probability of success.
+كل زوج يحتوي على:
+- symbol: اسم الزوج
+- score: التقييم الرياضي (من 100)
+- direction: الاتجاه المقترح (CALL أو PUT)
+- risk_flags: علامات المخاطر
+- features: البيانات الرقمية التفصيلية:
+  * rsi_1m: قيمة RSI (0-100)
+  * macd_hist_1m: قيمة MACD Histogram (موجبة أو سالبة)
+  * ema_position_1m: موقع السعر من EMA (true = أعلى, false = أسفل)
+  * structure_alignment: توافق هيكل السوق (true/false)
+  * atr_1m: مقياس التذبذب ATR
+  * vwap_distance_1m: المسافة من VWAP
+- last_close: آخر سعر إغلاق
 
-For each opportunity, return:
+⚠️ قواعد صارمة:
 
-- pair: Trading pair (e.g. "EUR/USD")
-- direction: "CALL" or "PUT"
-- expiry_minutes: 1, 2, or 3 (recommended expiry time)
-- pattern_conviction: 0.0 to 1.0 (how strong is the pattern)
-- momentum_strength: 0.0 to 1.0 (how strong is the momentum)
-- structure_alignment: true or false (do timeframes align)
-- risk_flags: array of strings (any concerns)
-- reasoning: array of strings IN ARABIC (why this is a good opportunity - MUST be in Arabic language)
-- confidence_modifier: -10 to +10 (adjustment to base confidence)
+1. اختر أفضل فرصتين فقط (top_2) للسكالبينغ السريع (1-3 دقائق)
+2. يجب أن يكون التحليل مبنياً على الأرقام المرسلة فقط
+3. اذكر القيم الرقمية داخل التحليل (مثال: "RSI عند 68 يشير إلى...")
+4. يمنع منعاً باتاً تكرار نفس الأسباب بين الزوجين
+5. كل زوج يجب أن يحصل على تحليل مخصص مختلف تماماً
+6. لا تستخدم عبارات عامة مثل "الزخم قوي" بدون ذكر الرقم
+7. التحليل باللغة العربية فقط
+8. لا تضف أي نص خارج JSON
 
-Important rules:
-1. You may reverse the initial direction ONLY if strong reversal evidence exists
-2. If reversing, clearly explain why in reasoning
-3. Prioritize opportunities with:
-   - High score (70+)
-   - Low risk flags
-   - Strong structure alignment
-   - Clear patterns
-4. Return STRICT JSON format
-5. CRITICAL: "top_2" MUST be a JSON array, NOT a string
-6. DO NOT wrap the array in quotes
-7. CRITICAL: "reasoning" array MUST be in ARABIC language only
+📋 الشكل المطلوب حصراً:
 
-Return format (EXACT structure required):
 {{
   "top_2": [
     {{
-      "pair": "EUR/USD",
-      "direction": "CALL",
-      "expiry_minutes": 2,
-      "pattern_conviction": 0.85,
-      "momentum_strength": 0.75,
-      "structure_alignment": true,
-      "risk_flags": [],
-      "reasoning": ["زخم صاعد قوي", "دعم من المتوسط المتحرك", "تقاطع إيجابي في الماكد"],
-      "confidence_modifier": 5
-    }},
-    {{
-      "pair": "GBP/JPY",
-      "direction": "PUT",
-      "expiry_minutes": 1,
-      "pattern_conviction": 0.70,
-      "momentum_strength": 0.65,
-      "structure_alignment": true,
-      "risk_flags": ["slight_divergence"],
-      "reasoning": ["نموذج ابتلاع هابط", "مستوى مقاومة قوي"],
-      "confidence_modifier": 0
+      "pair": "اسم الزوج",
+      "direction": "CALL أو PUT",
+      "expiry_minutes": 1 أو 2 أو 3,
+      "analysis": {{
+        "market_structure": "تحليل هيكل السوق بناءً على structure_alignment والأرقام",
+        "momentum": "تحليل الزخم مبني على RSI و MACD بالأرقام الفعلية",
+        "indicator_confluence": "تفسير توافق EMA و VWAP و ATR بالقيم الرقمية",
+        "risk_assessment": "تقييم المخاطر بناءً على ATR و risk_flags",
+        "entry_logic": "منطق الدخول المختصر المبني على الأرقام"
+      }},
+      "confidence_modifier": رقم من -10 إلى +10
     }}
   ]
 }}
 
-Candidates:
-{json.dumps(top_candidates, indent=2)}
+🔥 مثال توضيحي:
+
+بدلاً من: "الزخم قوي"
+اكتب: "RSI عند 72 يشير إلى تشبع شرائي قريب، لكن MACD +0.0035 يؤكد استمرار الدفع"
+
+بدلاً من: "دعم من المتوسط"
+اكتب: "السعر أعلى EMA بمسافة 0.12% مما يدل على تفوق المشترين"
+
+📊 البيانات:
+
+{json.dumps(top_candidates, indent=2, ensure_ascii=False)}
 """

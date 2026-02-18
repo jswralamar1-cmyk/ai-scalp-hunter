@@ -87,9 +87,27 @@ class SignalBuilder:
 
         dir_ar = "صعود (CALL)" if direction == "CALL" else "نزول (PUT)"
 
-        reasons = ai_pick.get("reasoning", []) or []
-        reasons = [r.strip() for r in reasons if isinstance(r, str) and r.strip()]
-        reasons = reasons[:6] if reasons else ["تحليل متعدد العوامل (زخم + هيكل + نمط)."]
+        # Get analysis from AI (new structure)
+        analysis = ai_pick.get("analysis", {})
+        if isinstance(analysis, dict) and analysis:
+            # Build detailed analysis sections
+            analysis_sections = []
+            if analysis.get("market_structure"):
+                analysis_sections.append(f"📐 هيكل السوق: {analysis['market_structure']}")
+            if analysis.get("momentum"):
+                analysis_sections.append(f"⚡ الزخم: {analysis['momentum']}")
+            if analysis.get("indicator_confluence"):
+                analysis_sections.append(f"📊 توافق المؤشرات: {analysis['indicator_confluence']}")
+            if analysis.get("entry_logic"):
+                analysis_sections.append(f"🎯 منطق الدخول: {analysis['entry_logic']}")
+            if analysis.get("risk_assessment"):
+                analysis_sections.append(f"⚠️ تقييم المخاطر: {analysis['risk_assessment']}")
+            reasons = analysis_sections if analysis_sections else ["تحليل متعدد العوامل"]
+        else:
+            # Fallback to old reasoning format
+            reasons = ai_pick.get("reasoning", []) or []
+            reasons = [r.strip() for r in reasons if isinstance(r, str) and r.strip()]
+            reasons = reasons[:6] if reasons else ["تحليل متعدد العوامل (زخم + هيكل + نمط)."]
 
         risk_flags = conf.get("risk_flags", []) or []
         risk_text = None
@@ -110,9 +128,10 @@ class SignalBuilder:
         lines.append(f"✅ الثقة النهائية: **{final_conf:.1f}%** ({quality})")
         lines.append(f"📊 Score رياضي: **{base_score}/100**")
         lines.append("")
-        lines.append("🧠 أسباب القرار:")
+        lines.append("🧠 التحليل التفصيلي:")
+        lines.append("")
         for r in reasons:
-            lines.append(f"• {r}")
+            lines.append(r)
 
         if risk_text:
             lines.append("")
