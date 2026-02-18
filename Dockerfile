@@ -17,8 +17,5 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 ENV TZ=UTC
 
-# Expose port for Render
-EXPOSE 10000
-
-# Run Flask app with background bot
-CMD ["python", "render_app.py"]
+# 🚀 تشغيل webhook mode
+CMD ["python", "render_webhook.py"]
