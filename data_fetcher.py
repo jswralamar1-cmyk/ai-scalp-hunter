@@ -60,15 +60,19 @@ class DataFetcher:
                             error_text = await response.text()
                             raise Exception(f"HTTP {response.status}: {error_text}")
 
-                        data = await response.json()
+                        try:
+                            data = await response.json()
+                        except Exception as json_err:
+                            raise Exception(f"Failed to parse JSON: {json_err}")
                         
                         # Check if data is None
                         if data is None:
                             raise Exception("API returned None")
                         
                         # Check for API error messages
-                        if "status" in data and data["status"] == "error":
-                            raise Exception(f"API Error: {data.get('message', 'Unknown error')}")
+                        if isinstance(data, dict) and "status" in data and data["status"] == "error":
+                            error_msg = data.get('message', 'Unknown error') if isinstance(data, dict) else 'Unknown error'
+                            raise Exception(f"API Error: {error_msg}")
                         
                         if "values" not in data:
                             raise Exception(f"Invalid response (no values): {data}")
