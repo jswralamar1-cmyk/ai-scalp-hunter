@@ -95,6 +95,11 @@ async def run_scalp_analysis(
         logger.info("Running AI analysis...")
         ai_result = await ai_engine.analyze(top_15)
         
+        # Check if AI returned None
+        if ai_result is None:
+            logger.error("AI returned None (unexpected)")
+            return []
+        
         if "error" in ai_result:
             logger.error(f"AI Error: {ai_result['error']}")
             return []

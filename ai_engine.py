@@ -40,6 +40,7 @@ class AIEngine:
             Dictionary with top_2 picks or error
         """
         try:
+            logger.info(f"Starting AI analysis for {len(top_candidates)} candidates")
             prompt = self._build_prompt(top_candidates)
             
             # Run Groq API in thread pool (it's synchronous)
@@ -65,6 +66,8 @@ class AIEngine:
             
             # Parse response
             content = response.choices[0].message.content
+            logger.info(f"AI raw response length: {len(content)} chars")
+            logger.debug(f"AI response: {content[:500]}...")  # First 500 chars
             parsed = json.loads(content)
             
             # Validate response structure
