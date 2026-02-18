@@ -1,13 +1,13 @@
 """
 data_fetcher.py
-AI Scalp Hunter | Async Data Fetcher
+AI Scalp Hunter - Async Data Fetcher (TwelveData Fixed)
 """
 
 import aiohttp
 import asyncio
 import time
 import pandas as pd
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 from config import TWELVEDATA_API_KEY, PERFORMANCE, CANDLES_COUNT
 
 BASE_URL = "https://api.twelvedata.com/time_series"
@@ -20,7 +20,7 @@ class DataFetcher:
         self.semaphore = asyncio.Semaphore(PERFORMANCE["max_concurrent"])
         self.timeout = aiohttp.ClientTimeout(total=15)
 
-    def _get_cached(self, symbol: str, timeframe: str):
+    def _get_cached(self, symbol: str, timeframe: str) -> Optional[pd.DataFrame]:
         key = (symbol, timeframe)
         if key in self.cache:
             cached_data = self.cache[key]
@@ -28,7 +28,7 @@ class DataFetcher:
                 return cached_data["data"]
         return None
 
-    def _set_cache(self, symbol: str, timeframe: str, data):
+    def _set_cache(self, symbol: str, timeframe: str, data: pd.DataFrame):
         key = (symbol, timeframe)
         self.cache[key] = {
             "data": data,
@@ -37,7 +37,9 @@ class DataFetcher:
 
     async def fetch_candles(self, session: aiohttp.ClientSession,
                             symbol: str,
-                            timeframe: str) -> pd.DataFrame | None:
+                            timeframe: str) -> Optional[pd.DataFrame]:
+
+        # التحقق من الكاش أولاً
         cached = self._get_cached(symbol, timeframe)
         if cached is not None:
             return cached
@@ -50,91 +52,57 @@ class DataFetcher:
             "format": "JSON"
         }
 
+        headers = {
+            "Accept-Encoding": "gzip, deflate"
+        }
+
         async with self.semaphore:
-            for attempt in range(3):  # 🔥 3 محاولات
+            for attempt in range(3):
                 try:
-                    # Disable brotli compression to avoid aiohttp compatibility issues
-                    headers = {'Accept-Encoding': 'gzip, deflate'}
-                    async with session.get(BASE_URL, params=params, headers=headers, timeout=self.timeout) as response:
+                    async with session.get(BASE_URL, params=params, headers=headers) as response:
                         if response.status != 200:
-                            error_text = await response.text()
-                            print(f"⚠️ TwelveData Error {response.status}: {error_text[:200]}")
+                            print(f"⚠️ TwelveData HTTP {response.status} for {symbol} {timeframe}")
                             if attempt == 2:
                                 return None
                             await asyncio.sleep(2)
                             continue
 
-                        try:
-                            data = await response.json()
-                            # 🔥 DEBUG: طباعة الرد الحقيقي
-                            if attempt == 0:  # فقط في المحاولة الأولى
-                                print(f"🔍 TwelveData response for {symbol}: {str(data)[:500]}")
-                        except Exception as json_err:
-                            print(f"⚠️ JSON parse error for {symbol}: {json_err}")
-                            # طباعة raw response
-                            try:
-                                raw_text = await response.text()
-                                print(f"🔍 Raw response: {raw_text[:500]}")
-                            except:
-                                pass
-                            if attempt == 2:
-                                return None
-                            await asyncio.sleep(2)
-                            continue
-                        
-                        # Check if data is None
-                        if data is None:
-                            print(f"⚠️ TwelveData returned None for {symbol}")
-                            if attempt == 2:
-                                return None
-                            await asyncio.sleep(2)
-                            continue
-                        
-                        # Check for API error messages
-                        if isinstance(data, dict) and "status" in data and data["status"] == "error":
-                            error_msg = data.get('message', 'Unknown error')
-                            error_code = data.get('code', 'unknown')
-                            print(f"⚠️ TwelveData API error for {symbol}: {error_code} - {error_msg}")
-                            if attempt == 2:
-                                return None
-                            await asyncio.sleep(2)
-                            continue
-                        
+                        # 🔥 قراءة الـ JSON
+                        data = await response.json()
+
                         # 🔥 التحقق من وجود "values"
-                        if "values" not in data:
-                            print(f"⚠️ TwelveData: no 'values' in response for {symbol}")
-                            print(f"🔍 Full response: {data}")
-                            if "code" in data:
-                                print(f"⚠️ TwelveData error code: {data['code']} - {data.get('message', '')}")
-                            if attempt == 2:
-                                return None
-                            await asyncio.sleep(2)
-                            continue
+                        if data is None:
+                            print(f"❌ TwelveData returned None for {symbol} {timeframe}")
+                            return None
 
+                        if "values" not in data:
+                            print(f"⚠️ TwelveData: no 'values' in response for {symbol} {timeframe}")
+                            print(f"   Response: {data}")
+                            return None
+
+                        # تحويل البيانات إلى DataFrame
                         df = pd.DataFrame(data["values"])
                         df = df.rename(columns={"datetime": "time"})
 
                         df["time"] = pd.to_datetime(df["time"])
                         df.set_index("time", inplace=True)
 
-                        # Convert numeric columns (forex pairs don't have volume)
-                        numeric_cols = ["open", "high", "low", "close"]
+                        # تحويل الأعمدة إلى أرقام
+                        numeric_cols = ["open", "high", "low", "close", "volume"]
                         for col in numeric_cols:
                             if col in df.columns:
                                 df[col] = pd.to_numeric(df[col], errors="coerce")
-                        
-                        # Handle volume if present (stocks/crypto)
-                        if "volume" in df.columns:
-                            df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
 
                         df = df.sort_index()
+
+                        # حفظ في الكاش
                         self._set_cache(symbol, timeframe, df)
+
                         return df
 
                 except Exception as e:
                     print(f"❌ Attempt {attempt+1}/3 failed for {symbol} {timeframe}: {e}")
                     if attempt == 2:
-                        print(f"❌ Failed fetching {symbol} {timeframe} after 3 attempts")
                         return None
                     await asyncio.sleep(2)
 
