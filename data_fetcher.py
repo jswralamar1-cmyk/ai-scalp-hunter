@@ -53,14 +53,23 @@ class DataFetcher:
         async with self.semaphore:
             for attempt in range(2):
                 try:
-                    async with session.get(BASE_URL, params=params) as response:
+                    async with session.get(BASE_URL, params=params, timeout=self.timeout) as response:
                         if response.status != 200:
-                            raise Exception(f"HTTP {response.status}")
+                            error_text = await response.text()
+                            raise Exception(f"HTTP {response.status}: {error_text}")
 
                         data = await response.json()
-
+                        
+                        # Check if data is None
+                        if data is None:
+                            raise Exception("API returned None")
+                        
+                        # Check for API error messages
+                        if "status" in data and data["status"] == "error":
+                            raise Exception(f"API Error: {data.get('message', 'Unknown error')}")
+                        
                         if "values" not in data:
-                            raise Exception(f"Invalid response: {data}")
+                            raise Exception(f"Invalid response (no values): {data}")
 
                         df = pd.DataFrame(data["values"])
                         df = df.rename(columns={"datetime": "time"})
