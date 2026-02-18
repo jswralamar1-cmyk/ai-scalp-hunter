@@ -106,6 +106,22 @@ class TelegramUI:
                 except Exception:
                     pass
 
+    def _reset_bot_connection(self):
+        """
+        محاولة تنظيف أي Webhook عالق أو طلبات GetUpdates قديمة
+        لضمان أن البوت يبدأ بحالة نظيفة.
+        """
+        try:
+            # محاولة حذف أي Webhook قد يكون مضبوطًا (آمنة حتى لو لم يكن موجودًا)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.app.bot.delete_webhook(drop_pending_updates=True))
+            loop.close()
+            logging.info("✅ تم تنظيف webhook وجلسات getUpdates القديمة.")
+        except Exception as e:
+            # هذا الخطأ متوقع إذا لم يكن هناك ويب هوك، لذلك نمرره بصمت
+            logging.debug(f"تحذير بسيط أثناء تنظيف الاتصال (غالبًا طبيعي): {e}")
+
     async def update_progress(self, message, stage: int):
         stages = [
             "جلب البيانات",
@@ -136,4 +152,5 @@ class TelegramUI:
 
     def run(self):
         logging.info("🚀 Starting AI Scalp Hunter...")
-        self.app.run_polling(drop_pending_updates=True)
+        self._reset_bot_connection()  # 🔥 تنظيف أي اتصال سابق
+        self.app.run_polling(drop_pending_updates=True)  # 🔥 استخدم drop_pending_updates
