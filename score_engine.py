@@ -106,12 +106,20 @@ class ScoreEngine:
             # Cap at 100
             score = min(100, score)
             
+            # Get last close price from df_1m or features
+            last_close = 0.0
+            if df_1m is not None and len(df_1m) > 0:
+                last_close = float(df_1m["close"].iloc[-1])
+            elif "close_1m" in features:
+                last_close = float(features["close_1m"])
+            
             return {
                 "symbol": symbol,
                 "score": score,
                 "direction": direction,
                 "risk_flags": risk_flags,
-                "features": features
+                "features": features,
+                "last_close": last_close
             }
         
         except Exception as e:

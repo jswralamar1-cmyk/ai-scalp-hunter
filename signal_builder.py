@@ -24,6 +24,15 @@ class SignalBuilder:
         self.min_conf = CONFIDENCE["min_to_show"]
 
     def build_one(self, ai_pick: Dict, score_snapshot: Dict, timeframe_label: str) -> Optional[Dict]:
+        # Validate required fields
+        if "pair" not in ai_pick or "direction" not in ai_pick:
+            return None
+        
+        # Use market price, not AI-generated price
+        market_price = float(score_snapshot.get("last_close", 0))
+        if market_price == 0:
+            return None
+        
         conf = self.conf_engine.calculate(score_snapshot, ai_pick)
         if not conf["accepted"]:
             return None
@@ -31,7 +40,7 @@ class SignalBuilder:
         repeat = self.anti_repeat.check(
             pair=ai_pick["pair"],
             direction=ai_pick["direction"],
-            price=float(ai_pick["entry_price"])
+            price=market_price
         )
 
         message = self._build_arabic_message(
@@ -46,14 +55,14 @@ class SignalBuilder:
             "pair": ai_pick["pair"],
             "timeframe": timeframe_label,
             "direction": ai_pick["direction"],
-            "entry_price": float(ai_pick["entry_price"]),
+            "entry_price": market_price,
             "expiry_minutes": int(ai_pick.get("expiry_minutes", 1))
         }
 
         return {
             "pair": ai_pick["pair"],
             "direction": ai_pick["direction"],
-            "entry_price": float(ai_pick["entry_price"]),
+            "entry_price": market_price,
             "expiry_minutes": int(ai_pick.get("expiry_minutes", 1)),
             "final_confidence": conf["final_confidence"],
             "quality": conf["quality"],
@@ -70,7 +79,7 @@ class SignalBuilder:
                               timeframe_label: str, repeat_warning: Optional[str]) -> str:
         pair = ai_pick["pair"]
         direction = ai_pick["direction"]
-        entry = float(ai_pick["entry_price"])
+        entry = float(score_snapshot.get("last_close", 0))
         expiry = int(ai_pick.get("expiry_minutes", 1))
         final_conf = conf["final_confidence"]
         quality = conf["quality"]
