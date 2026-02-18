@@ -17,5 +17,5 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 ENV TZ=UTC
 
-# 🚀 تشغيل webhook mode
-CMD ["python", "render_webhook.py"]
+# 🚀 تشغيل polling mode (simple and stable)
+CMD ["python", "main.py"]

@@ -67,12 +67,47 @@ class AIEngine:
             content = response.choices[0].message.content
             parsed = json.loads(content)
             
-            # Validate response
+            # Validate response structure
+            if not isinstance(parsed, dict):
+                logger.error("AI response is not a dictionary")
+                return {"error": "Invalid AI response format"}
+            
             if "top_2" not in parsed:
                 logger.error("AI response missing 'top_2' field")
                 return {"error": "Invalid AI response format"}
             
-            return parsed
+            if not isinstance(parsed["top_2"], list):
+                logger.error("AI 'top_2' is not a list")
+                return {"error": "Invalid AI response format"}
+            
+            # Validate each pick has required fields
+            validated_picks = []
+            for pick in parsed["top_2"]:
+                if not isinstance(pick, dict):
+                    logger.warning("Skipping non-dict pick")
+                    continue
+                
+                # Must have pair and direction
+                if "pair" not in pick or "direction" not in pick:
+                    logger.warning(f"Skipping pick without pair/direction: {pick}")
+                    continue
+                
+                # Add defaults for missing optional fields
+                pick.setdefault("expiry_minutes", 2)
+                pick.setdefault("pattern_conviction", 0.5)
+                pick.setdefault("momentum_strength", 0.5)
+                pick.setdefault("structure_alignment", False)
+                pick.setdefault("risk_flags", [])
+                pick.setdefault("reasoning", [])
+                pick.setdefault("confidence_modifier", 0)
+                
+                validated_picks.append(pick)
+            
+            if not validated_picks:
+                logger.error("No valid picks after validation")
+                return {"error": "No valid AI picks"}
+            
+            return {"top_2": validated_picks}
         
         except asyncio.TimeoutError:
             logger.error(f"AI timeout after {AI_TIMEOUT}s")
