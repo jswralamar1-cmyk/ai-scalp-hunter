@@ -17,5 +17,5 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 ENV TZ=UTC
 
-# 🚀 تشغيل polling mode (simple and stable)
-CMD ["python", "main.py"]
+# 🚀 Polling Mode - No Flask, No Webhook, No PORT
+CMD ["python", "telegram_ui.py"]
