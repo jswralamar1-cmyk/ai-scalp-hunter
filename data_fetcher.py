@@ -51,31 +51,55 @@ class DataFetcher:
         }
 
         async with self.semaphore:
-            for attempt in range(2):
+            for attempt in range(3):  # 🔥 3 محاولات
                 try:
                     # Disable brotli compression to avoid aiohttp compatibility issues
                     headers = {'Accept-Encoding': 'gzip, deflate'}
                     async with session.get(BASE_URL, params=params, headers=headers, timeout=self.timeout) as response:
                         if response.status != 200:
                             error_text = await response.text()
-                            raise Exception(f"HTTP {response.status}: {error_text}")
+                            print(f"⚠️ TwelveData Error {response.status}: {error_text[:200]}")
+                            if attempt == 2:
+                                return None
+                            await asyncio.sleep(2)
+                            continue
 
                         try:
                             data = await response.json()
                         except Exception as json_err:
-                            raise Exception(f"Failed to parse JSON: {json_err}")
+                            print(f"⚠️ JSON parse error for {symbol}: {json_err}")
+                            if attempt == 2:
+                                return None
+                            await asyncio.sleep(2)
+                            continue
                         
                         # Check if data is None
                         if data is None:
-                            raise Exception("API returned None")
+                            print(f"⚠️ TwelveData returned None for {symbol}")
+                            if attempt == 2:
+                                return None
+                            await asyncio.sleep(2)
+                            continue
                         
                         # Check for API error messages
                         if isinstance(data, dict) and "status" in data and data["status"] == "error":
-                            error_msg = data.get('message', 'Unknown error') if isinstance(data, dict) else 'Unknown error'
-                            raise Exception(f"API Error: {error_msg}")
+                            error_msg = data.get('message', 'Unknown error')
+                            error_code = data.get('code', 'unknown')
+                            print(f"⚠️ TwelveData API error for {symbol}: {error_code} - {error_msg}")
+                            if attempt == 2:
+                                return None
+                            await asyncio.sleep(2)
+                            continue
                         
+                        # 🔥 التحقق من وجود "values"
                         if "values" not in data:
-                            raise Exception(f"Invalid response (no values): {data}")
+                            print(f"⚠️ TwelveData: no 'values' in response for {symbol}: {data.get('status', 'unknown')}")
+                            if "code" in data:
+                                print(f"⚠️ TwelveData error code: {data['code']} - {data.get('message', '')}")
+                            if attempt == 2:
+                                return None
+                            await asyncio.sleep(2)
+                            continue
 
                         df = pd.DataFrame(data["values"])
                         df = df.rename(columns={"datetime": "time"})
@@ -98,9 +122,10 @@ class DataFetcher:
                         return df
 
                 except Exception as e:
-                    if attempt == 1:
-                        print(f"❌ Failed fetching {symbol} {timeframe}: {e}")
+                    print(f"❌ Attempt {attempt+1}/3 failed for {symbol} {timeframe}: {e}")
+                    if attempt == 2:
+                        print(f"❌ Failed fetching {symbol} {timeframe} after 3 attempts")
                         return None
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(2)
 
         return None

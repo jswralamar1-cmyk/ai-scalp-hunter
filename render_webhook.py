@@ -19,6 +19,27 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+# ====================================================
+# 🔥 إيقاف Polling نهائياً
+# ====================================================
+async def force_delete_webhook():
+    """فرض حذف webhook وإيقاف أي polling عالق"""
+    try:
+        bot = Bot(token=TELEGRAM_TOKEN)
+        await bot.delete_webhook(drop_pending_updates=True)
+        logging.info("✅ Webhook deleted, polling stopped")
+    except Exception as e:
+        logging.warning(f"⚠️ Could not delete webhook: {e}")
+
+# تنفيذ فوراً قبل بدء Flask
+try:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(force_delete_webhook())
+    loop.close()
+except Exception as e:
+    logging.warning(f"⚠️ force_delete_webhook failed: {e}")
+
 # Flask app
 app = Flask(__name__)
 
