@@ -19,6 +19,55 @@ from config import SYMBOLS, TOP_CANDIDATES_COUNT
 logger = logging.getLogger(__name__)
 
 
+def normalize_ai_signal(ai_item: dict) -> dict | None:
+    """
+    Converts raw AI response item into internal signal format.
+    Returns normalized dict or None if invalid.
+    """
+    try:
+        # Basic validation
+        if not isinstance(ai_item, dict):
+            return None
+
+        symbol = ai_item.get("pair")
+        direction = ai_item.get("direction")
+        expiry = ai_item.get("expiry_minutes")
+
+        if not symbol or not direction or not expiry:
+            logger.warning(f"AI item missing required fields: {ai_item}")
+            return None
+        
+        # Validate direction
+        if direction not in ["CALL", "PUT"]:
+            logger.warning(f"Invalid direction: {direction}")
+            return None
+        
+        # Validate expiry
+        try:
+            expiry_int = int(expiry)
+            if expiry_int < 1 or expiry_int > 3:
+                logger.warning(f"Expiry out of range: {expiry}")
+                expiry_int = 2  # Default
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid expiry: {expiry}")
+            expiry_int = 2
+
+        normalized = {
+            "symbol": symbol,
+            "pair": symbol,  # Keep both for compatibility
+            "direction": direction,
+            "expiry_minutes": expiry_int,
+            "confidence_modifier": ai_item.get("confidence_modifier", 0),
+            "analysis": ai_item.get("analysis", {}),
+        }
+
+        return normalized
+
+    except Exception as e:
+        logger.error(f"AI normalization error: {e}")
+        return None
+
+
 async def run_scalp_analysis(
     progress_callback: Optional[Callable[[int], Awaitable[None]]] = None
 ) -> List[Dict]:
@@ -115,20 +164,27 @@ async def run_scalp_analysis(
             await progress_callback(5)
         
         signals = []
-        for pick in ai_result["top_2"]:
+        for ai_item in ai_result["top_2"]:
+            # Normalize AI output to internal format
+            normalized = normalize_ai_signal(ai_item)
+            
+            if not normalized:
+                logger.warning("Invalid AI signal skipped")
+                continue
+            
             # Find matching score snapshot
             score_snap = next(
-                (s for s in scored if s["symbol"] == pick["pair"]),
+                (s for s in scored if s["symbol"] == normalized["symbol"]),
                 None
             )
             
             if not score_snap:
-                logger.warning(f"No score snapshot for {pick['pair']}")
+                logger.warning(f"No score snapshot for {normalized['symbol']}")
                 continue
             
             # Build signal
             signal = signal_builder.build_one(
-                ai_pick=pick,
+                ai_pick=normalized,
                 score_snapshot=score_snap,
                 timeframe_label="1m"
             )
