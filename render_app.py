@@ -1,11 +1,11 @@
 """
 render_app.py
 AI Scalp Hunter - Render Compatible Version
+Flask runs in background, Bot runs in main thread
 """
 
 import threading
 import logging
-import asyncio
 from flask import Flask, jsonify
 from telegram_ui import TelegramUI
 
@@ -17,30 +17,11 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Bot status
-bot_status = {"running": False, "error": None}
-
-
-def run_bot():
-    """Run Telegram bot in background thread"""
-    global bot_status
-    try:
-        logger.info("🚀 Starting Telegram Bot in background...")
-        # Create new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        bot_status["running"] = True
-        bot = TelegramUI()
-        bot.run()
-    except Exception as e:
-        logger.error(f"❌ Bot error: {e}")
-        bot_status["running"] = False
-        bot_status["error"] = str(e)
-
-
 # Flask app
 app = Flask(__name__)
+
+# Bot status
+bot_status = {"running": False, "started": False}
 
 
 @app.route('/')
@@ -49,7 +30,7 @@ def home():
     return jsonify({
         "status": "running",
         "message": "AI Scalp Hunter is alive! 🚀",
-        "bot": "active" if bot_status["running"] else "error",
+        "bot": "running" if bot_status["started"] else "starting",
         "version": "1.0.0"
     })
 
@@ -57,22 +38,17 @@ def home():
 @app.route('/health')
 def health():
     """Health check endpoint for Render"""
-    if bot_status["running"]:
-        return jsonify({"status": "healthy", "bot": "running"}), 200
-    else:
-        return jsonify({
-            "status": "unhealthy",
-            "bot": "stopped",
-            "error": bot_status.get("error")
-        }), 503
+    return jsonify({
+        "status": "healthy",
+        "bot": "running" if bot_status["started"] else "starting"
+    }), 200
 
 
 @app.route('/status')
 def status():
     """Detailed status endpoint"""
     return jsonify({
-        "bot_running": bot_status["running"],
-        "bot_error": bot_status.get("error"),
+        "bot_started": bot_status["started"],
         "endpoints": {
             "/": "Home",
             "/health": "Health check",
@@ -81,12 +57,22 @@ def status():
     })
 
 
-# Start bot in background when app starts
-logger.info("🔧 Initializing AI Scalp Hunter...")
-bot_thread = threading.Thread(target=run_bot, daemon=True)
-bot_thread.start()
-logger.info("✅ Bot thread started")
+def run_flask():
+    """Run Flask in background thread"""
+    logger.info("🌐 Starting Flask server in background on port 10000...")
+    app.run(host="0.0.0.0", port=10000, debug=False, use_reloader=False)
+
 
 if __name__ == "__main__":
-    logger.info("🌐 Starting Flask server on port 10000...")
-    app.run(host="0.0.0.0", port=10000)
+    logger.info("🚀 Initializing AI Scalp Hunter...")
+    
+    # Start Flask in background thread
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logger.info("✅ Flask thread started")
+    
+    # Run bot in main thread
+    logger.info("🤖 Starting Telegram Bot in main thread...")
+    bot_status["started"] = True
+    bot = TelegramUI()
+    bot.run()
