@@ -1,6 +1,6 @@
 """
 render_webhook.py
-AI Scalp Hunter - Webhook Mode for Render
+AI Scalp Hunter - Simplified Webhook Version
 """
 
 import os
@@ -19,42 +19,20 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# ====================================================
-# 🔥 إيقاف Polling نهائياً
-# ====================================================
-async def force_delete_webhook():
-    """فرض حذف webhook وإيقاف أي polling عالق"""
-    try:
-        bot = Bot(token=TELEGRAM_TOKEN)
-        await bot.delete_webhook(drop_pending_updates=True)
-        logging.info("✅ Webhook deleted, polling stopped")
-    except Exception as e:
-        logging.warning(f"⚠️ Could not delete webhook: {e}")
-
-# تنفيذ فوراً قبل بدء Flask
-try:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(force_delete_webhook())
-    loop.close()
-except Exception as e:
-    logging.warning(f"⚠️ force_delete_webhook failed: {e}")
-
-# Flask app
 app = Flask(__name__)
 
 # متغيرات عامة
-application = None
+_bot_app = None
+_bot_initialized = False
 user_locks = {}
 
 # ====================================================
-# 🚀 أوامر البوت
+# 🤖 دوال البوت
 # ====================================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رسالة الترحيب مع الزر"""
     keyboard = [[InlineKeyboardButton("🎯 اصطاد سكالبينغ", callback_data="hunt")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     await update.message.reply_text(
         "🔍 **AI Scalp Hunter**\n\n"
         "اضغط الزر لبدء التحليل الذكي.\n"
@@ -64,30 +42,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة ضغط الزر"""
     query = update.callback_query
     await query.answer()
-    
+
     if query.data == "hunt":
         await process_hunt(update, context)
 
-# ====================================================
-# 🎯 معالجة التحليل
-# ====================================================
 async def process_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تنفيذ عملية الصيد"""
     user_id = update.effective_user.id
-    
-    # منع double-click
+
     if user_locks.get(user_id, False):
         await update.callback_query.answer("⚠️ التحليل جارٍ حالياً...", show_alert=True)
         return
-    
+
     user_locks[user_id] = True
     progress_msg = None
-    
+
     try:
-        # رسالة التقدم
         progress_msg = await update.callback_query.edit_message_text(
             "🔍 **AI Scalp Hunter**\n\n"
             "⏳ جاري التحليل...\n\n"
@@ -100,42 +71,12 @@ async def process_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "⚪ تجهيز النتائج",
             parse_mode="Markdown"
         )
-        
-        # تعريف دالة تحديث التقدم
-        async def update_progress(stage: int):
-            stages = [
-                "جلب البيانات",
-                "حساب المؤشرات",
-                "فلترة أفضل 15",
-                "الذكاء الاصطناعي يحلل",
-                "حساب الثقة",
-                "التحقق من التكرار",
-                "تجهيز النتائج"
-            ]
-            
-            text = "🔍 **AI Scalp Hunter**\n\n⏳ جاري التحليل...\n\n"
-            
-            for i, s in enumerate(stages, 1):
-                if i < stage:
-                    text += f"✅ {s}\n"
-                elif i == stage:
-                    text += f"⏳ {s}\n"
-                else:
-                    text += f"⚪ {s}\n"
-            
-            try:
-                await progress_msg.edit_text(text, parse_mode="Markdown")
-            except:
-                pass
-            
-            await asyncio.sleep(0.4)
-        
+
         # تشغيل التحليل
         result = await run_scalp_analysis(
-            progress_callback=update_progress
+            progress_callback=lambda stage: update_progress(progress_msg, stage)
         )
-        
-        # إرسال النتائج
+
         if result and len(result) > 0:
             for signal in result:
                 if signal.get("chart_path") and os.path.exists(signal["chart_path"]):
@@ -162,12 +103,12 @@ async def process_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ),
                 parse_mode="Markdown"
             )
-            
+
     except Exception as e:
         logging.exception("Error during analysis")
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="❌ حدث خطأ أثناء التحليل.\nحاول مجدداً بعد قليل."
+            text=f"❌ حدث خطأ أثناء التحليل: {str(e)[:100]}"
         )
     finally:
         user_locks[user_id] = False
@@ -177,44 +118,75 @@ async def process_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
 
+async def update_progress(message, stage: int):
+    stages = [
+        "جلب البيانات",
+        "حساب المؤشرات",
+        "فلترة أفضل 15",
+        "الذكاء الاصطناعي يحلل",
+        "حساب الثقة",
+        "التحقق من التكرار",
+        "تجهيز النتائج"
+    ]
+
+    text = "🔍 **AI Scalp Hunter**\n\n⏳ جاري التحليل...\n\n"
+
+    for i, s in enumerate(stages, 1):
+        if i < stage:
+            text += f"✅ {s}\n"
+        elif i == stage:
+            text += f"⏳ {s}\n"
+        else:
+            text += f"⚪ {s}\n"
+
+    try:
+        await message.edit_text(text, parse_mode="Markdown")
+    except:
+        pass
+
+    await asyncio.sleep(0.4)
+
 # ====================================================
-# 🌐 Webhook Setup
+# 🚀 إعداد البوت
 # ====================================================
-async def setup_webhook():
-    """إعداد webhook للبوت"""
-    global application
-    
-    # بناء التطبيق بدون updater
-    application = (
-        Application.builder()
-        .token(TELEGRAM_TOKEN)
-        .updater(None)
-        .build()
-    )
-    
-    # إضافة handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    
-    # تهيئة التطبيق
-    await application.initialize()
-    
-    # تعيين webhook
-    render_url = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
-    if not render_url:
-        # للاختبار المحلي
+def init_bot_sync():
+    """تهيئة البوت بشكل متزامن (تُستدعى مرة واحدة عند بدء التشغيل)"""
+    global _bot_app, _bot_initialized
+
+    if _bot_initialized:
+        return _bot_app
+
+    async def init_async():
+        global _bot_app
+        # بناء التطبيق
+        _bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+        _bot_app.add_handler(CommandHandler("start", start))
+        _bot_app.add_handler(CallbackQueryHandler(button_callback))
+        await _bot_app.initialize()
+
+        # حذف أي webhook سابق
+        await _bot_app.bot.delete_webhook(drop_pending_updates=True)
+        logging.info("✅ Webhook القديم تم حذفه")
+
+        # تعيين webhook جديد
         webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME', 'ai-scalp-hunter.onrender.com')}/webhook"
-    else:
-        webhook_url = f"https://{render_url}/webhook"
-    
-    await application.bot.set_webhook(
-        url=webhook_url,
-        drop_pending_updates=True,
-        allowed_updates=['message', 'callback_query']
-    )
-    
-    logging.info(f"✅ Webhook set to {webhook_url}")
-    return application
+        await _bot_app.bot.set_webhook(
+            url=webhook_url,
+            drop_pending_updates=True,
+            allowed_updates=['message', 'callback_query']
+        )
+        logging.info(f"✅ Webhook جديد تم تعيينه: {webhook_url}")
+
+    # تشغيل الدالة غير المتزامنة
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(init_async())
+    finally:
+        loop.close()
+
+    _bot_initialized = True
+    return _bot_app
 
 # ====================================================
 # 🚀 Flask Routes
@@ -235,22 +207,23 @@ def health():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """استقبال التحديثات من تيليغرام"""
-    global application
-    
-    if application is None:
+    global _bot_app
+
+    if _bot_app is None:
         return jsonify({"error": "Bot not initialized"}), 503
-    
+
     try:
         # تحويل الطلب إلى تحديث
         update_json = request.get_json(force=True)
-        update = Update.de_json(update_json, application.bot)
-        
-        # معالجة التحديث
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(application.process_update(update))
-        loop.close()
-        
+
+        # معالجة التحديث بشكل متزامن
+        async def process_update_async():
+            update = Update.de_json(update_json, _bot_app.bot)
+            await _bot_app.process_update(update)
+
+        # استخدام asyncio.run() - آمن ويدير الـ loop بنفسه
+        asyncio.run(process_update_async())
+
         return jsonify({"status": "ok"}), 200
     except Exception as e:
         logging.error(f"Webhook error: {e}")
@@ -260,18 +233,11 @@ def webhook():
 # 🏁 تشغيل التطبيق
 # ====================================================
 if __name__ == "__main__":
-    # إعداد webhook
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    try:
-        application = loop.run_until_complete(setup_webhook())
-        logging.info("🚀 Starting Flask server...")
-        port = int(os.environ.get("PORT", 10000))
-        app.run(host="0.0.0.0", port=port)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        if application:
-            loop.run_until_complete(application.shutdown())
-        loop.close()
+    # تهيئة البوت مرة واحدة فقط
+    logging.info("🚀 Initializing bot...")
+    init_bot_sync()
+
+    # تشغيل Flask
+    port = int(os.environ.get("PORT", 10000))
+    logging.info(f"🚀 Starting Flask server on port {port}...")
+    app.run(host="0.0.0.0", port=port)
