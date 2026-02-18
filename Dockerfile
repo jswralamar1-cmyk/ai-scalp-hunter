@@ -17,4 +17,8 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 ENV TZ=UTC
 
-CMD ["python", "bot.py"]
+# Expose port for Render
+EXPOSE 10000
+
+# Run Flask app with background bot
+CMD ["python", "render_app.py"]

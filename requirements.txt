@@ -6,3 +6,4 @@ mplfinance==0.12.10
 matplotlib==3.8.2
 groq==0.4.0
 python-dotenv==1.0.0
+flask==3.0.0
