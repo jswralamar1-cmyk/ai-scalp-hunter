@@ -174,7 +174,7 @@ For each opportunity, return:
 - momentum_strength: 0.0 to 1.0 (how strong is the momentum)
 - structure_alignment: true or false (do timeframes align)
 - risk_flags: array of strings (any concerns)
-- reasoning: array of strings (why this is a good opportunity)
+- reasoning: array of strings IN ARABIC (why this is a good opportunity - MUST be in Arabic language)
 - confidence_modifier: -10 to +10 (adjustment to base confidence)
 
 Important rules:
@@ -188,6 +188,7 @@ Important rules:
 4. Return STRICT JSON format
 5. CRITICAL: "top_2" MUST be a JSON array, NOT a string
 6. DO NOT wrap the array in quotes
+7. CRITICAL: "reasoning" array MUST be in ARABIC language only
 
 Return format (EXACT structure required):
 {{
@@ -200,7 +201,7 @@ Return format (EXACT structure required):
       "momentum_strength": 0.75,
       "structure_alignment": true,
       "risk_flags": [],
-      "reasoning": ["Strong bullish momentum", "EMA support", "MACD crossover"],
+      "reasoning": ["زخم صاعد قوي", "دعم من المتوسط المتحرك", "تقاطع إيجابي في الماكد"],
       "confidence_modifier": 5
     }},
     {{
@@ -211,7 +212,7 @@ Return format (EXACT structure required):
       "momentum_strength": 0.65,
       "structure_alignment": true,
       "risk_flags": ["slight_divergence"],
-      "reasoning": ["Bearish engulfing", "Resistance level"],
+      "reasoning": ["نموذج ابتلاع هابط", "مستوى مقاومة قوي"],
       "confidence_modifier": 0
     }}
   ]
