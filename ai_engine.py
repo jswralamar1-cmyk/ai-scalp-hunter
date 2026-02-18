@@ -84,6 +84,16 @@ class AIEngine:
                 logger.error("AI response missing 'top_2' field")
                 return {"error": "Invalid AI response format"}
             
+            # Defensive parsing: handle string-encoded arrays
+            if isinstance(parsed["top_2"], str):
+                logger.warning("AI returned top_2 as string, attempting to parse...")
+                try:
+                    parsed["top_2"] = json.loads(parsed["top_2"])
+                    logger.info("Successfully parsed top_2 from string")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse top_2 string: {e}")
+                    return {"error": "Invalid AI response format"}
+            
             if not isinstance(parsed["top_2"], list):
                 logger.error(f"AI 'top_2' is not a list, it's: {type(parsed['top_2'])}")
                 logger.error(f"AI 'top_2' content: {parsed['top_2']}")
@@ -91,14 +101,23 @@ class AIEngine:
             
             # Validate each pick has required fields
             validated_picks = []
-            for pick in parsed["top_2"]:
+            for i, pick in enumerate(parsed["top_2"]):
+                # Defensive: handle string-encoded picks
+                if isinstance(pick, str):
+                    logger.warning(f"Pick {i} is string, attempting to parse...")
+                    try:
+                        pick = json.loads(pick)
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse pick {i} from string")
+                        continue
+                
                 if not isinstance(pick, dict):
-                    logger.warning("Skipping non-dict pick")
+                    logger.warning(f"Skipping non-dict pick {i}: {type(pick)}")
                     continue
                 
                 # Must have pair and direction
                 if "pair" not in pick or "direction" not in pick:
-                    logger.warning(f"Skipping pick without pair/direction: {pick}")
+                    logger.warning(f"Skipping pick {i} without pair/direction: {pick}")
                     continue
                 
                 # Add defaults for missing optional fields
@@ -167,8 +186,10 @@ Important rules:
    - Strong structure alignment
    - Clear patterns
 4. Return STRICT JSON format
+5. CRITICAL: "top_2" MUST be a JSON array, NOT a string
+6. DO NOT wrap the array in quotes
 
-Return format:
+Return format (EXACT structure required):
 {{
   "top_2": [
     {{
