@@ -1,67 +1,131 @@
 """
 data_fetcher.py
-AI Scalp Hunter - Async Data Fetcher (Compatible)
+AI Scalp Hunter - Professional Data Fetcher
+Rewritten for stability and clarity
 """
 
 import aiohttp
 import asyncio
 import pandas as pd
+import logging
 from typing import Optional
 from config import TWELVEDATA_API_KEY, CANDLES_COUNT
 
-BASE_URL = "https://api.twelvedata.com/time_series"
+logger = logging.getLogger(__name__)
 
 
 class DataFetcher:
-    def __init__(self):
-        self.semaphore = asyncio.Semaphore(10)
-
-    async def fetch_candles(self, session, symbol: str, timeframe: str) -> Optional[pd.DataFrame]:
+    """
+    Fetches OHLCV data from TwelveData API
+    - Uses semaphore to limit concurrent requests
+    - Handles errors gracefully
+    - Returns clean DataFrame or None
+    """
+    
+    BASE_URL = "https://api.twelvedata.com/time_series"
+    
+    def __init__(self, max_concurrent: int = 10):
+        self.semaphore = asyncio.Semaphore(max_concurrent)
+        self.session: Optional[aiohttp.ClientSession] = None
+    
+    async def fetch_candles(
+        self, 
+        session,  # Ignored, kept for compatibility
+        symbol: str, 
+        timeframe: str
+    ) -> Optional[pd.DataFrame]:
         """
-        تجلب بيانات الشموع لزوج معين
-        ملاحظة: session تُهمل (ننشئ session خاص داخل الدالة)
+        Fetch candles for a symbol and timeframe
+        
+        Args:
+            session: Ignored (kept for backward compatibility)
+            symbol: Trading pair (e.g. "EUR/USD")
+            timeframe: Interval (e.g. "1min", "5min")
+        
+        Returns:
+            DataFrame with OHLCV data or None if failed
         """
-        # 🔥 نحول timeframe من "1min" إلى "1min" (هو نفسه)
-        interval = timeframe
-
-        params = {
-            "symbol": symbol,
-            "interval": interval,
-            "outputsize": CANDLES_COUNT,
-            "apikey": TWELVEDATA_API_KEY,
-        }
-
-        headers = {
-            "Accept-Encoding": "gzip, deflate"
-        }
-
         async with self.semaphore:
             try:
-                # 🔥 ننشئ session خاص بنا بدلاً من استخدام session الوارد
+                # Create fresh session for each request
                 async with aiohttp.ClientSession() as new_session:
-                    async with new_session.get(BASE_URL, params=params, headers=headers) as resp:
+                    params = {
+                        "symbol": symbol,
+                        "interval": timeframe,
+                        "outputsize": CANDLES_COUNT,
+                        "apikey": TWELVEDATA_API_KEY,
+                    }
+                    
+                    headers = {
+                        "Accept-Encoding": "gzip, deflate"  # Disable brotli
+                    }
+                    
+                    async with new_session.get(
+                        self.BASE_URL, 
+                        params=params, 
+                        headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=15)
+                    ) as resp:
+                        
+                        # Check HTTP status
                         if resp.status != 200:
-                            print(f"⚠️ HTTP {resp.status} for {symbol} {interval}")
+                            logger.warning(f"HTTP {resp.status} for {symbol} {timeframe}")
                             return None
-
-                        data = await resp.json()
-                        print(f"🔍 TwelveData response for {symbol}: {data}")  # 🔥 DEBUG
-
-                        if "values" not in data:
-                            print(f"⚠️ No 'values' in response for {symbol} {interval}")
+                        
+                        # Parse JSON
+                        try:
+                            data = await resp.json()
+                        except Exception as e:
+                            logger.error(f"JSON parse error for {symbol}: {e}")
                             return None
-
+                        
+                        # Check for API errors
+                        if "status" in data and data["status"] == "error":
+                            logger.warning(f"API error for {symbol}: {data.get('message', 'Unknown')}")
+                            return None
+                        
+                        # Check for values
+                        if "values" not in data or not data["values"]:
+                            logger.warning(f"No values for {symbol} {timeframe}")
+                            return None
+                        
+                        # Build DataFrame
                         df = pd.DataFrame(data["values"])
+                        
+                        # Rename datetime column
                         df = df.rename(columns={"datetime": "time"})
+                        
+                        # Convert time to datetime
                         df["time"] = pd.to_datetime(df["time"])
-                        df.set_index("time", inplace=True)
-
-                        for col in ["open", "high", "low", "close", "volume"]:
+                        df = df.set_index("time")
+                        
+                        # Convert OHLCV to numeric
+                        for col in ["open", "high", "low", "close"]:
                             if col in df.columns:
                                 df[col] = pd.to_numeric(df[col], errors="coerce")
-
-                        return df.sort_index()
-
+                        
+                        # Volume might be missing for forex
+                        if "volume" in df.columns:
+                            df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
+                        else:
+                            df["volume"] = 0.0
+                        
+                        # Sort by time (oldest first)
+                        df = df.sort_index()
+                        
+                        # Drop rows with NaN in OHLC
+                        df = df.dropna(subset=["open", "high", "low", "close"])
+                        
+                        if len(df) < 50:
+                            logger.warning(f"Insufficient data for {symbol} {timeframe}: {len(df)} candles")
+                            return None
+                        
+                        return df
+            
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout fetching {symbol} {timeframe}")
+                return None
+            
             except Exception as e:
-                print(f"❌ Error fetching {symbol} {interval}: {e}")
+                logger.error(f"Unexpected error fetching {symbol} {timeframe}: {e}")
                 return None
