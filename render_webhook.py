@@ -1,12 +1,13 @@
 """
 render_webhook.py
 AI Scalp Hunter - Professional Webhook Server for Render
-Clean, stable, production-ready
+Fixed: Event loop management for webhook requests
 """
 
 import os
 import asyncio
 import logging
+import threading
 from flask import Flask, request, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -23,8 +24,10 @@ logger = logging.getLogger(__name__)
 # Flask app
 app = Flask(__name__)
 
-# Global bot application
+# Global bot application and event loop
 telegram_app = None
+bot_loop = None
+bot_thread = None
 user_locks = {}
 
 
@@ -160,16 +163,14 @@ async def update_progress(message, stage: int):
     await asyncio.sleep(0.4)
 
 
-def init_bot():
-    """Initialize Telegram bot (called once at startup)"""
-    global telegram_app
+def run_bot_loop():
+    """Run bot event loop in separate thread"""
+    global bot_loop, telegram_app
     
-    if not TELEGRAM_TOKEN:
-        raise ValueError("TELEGRAM_TOKEN is not set")
+    bot_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(bot_loop)
     
-    logger.info("Initializing Telegram bot...")
-    
-    async def init_async():
+    async def init_and_run():
         global telegram_app
         
         # Build application
@@ -194,16 +195,40 @@ def init_bot():
             allowed_updates=['message', 'callback_query']
         )
         logger.info(f"Webhook set to: {webhook_url}")
+        logger.info("Bot initialized successfully")
+        
+        # Keep loop running
+        while True:
+            await asyncio.sleep(1)
     
-    # Run async initialization
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        loop.run_until_complete(init_async())
-    finally:
-        loop.close()
+        bot_loop.run_until_complete(init_and_run())
+    except Exception as e:
+        logger.error(f"Bot loop error: {e}")
+
+
+def init_bot():
+    """Initialize Telegram bot in separate thread"""
+    global bot_thread
     
-    logger.info("Bot initialized successfully")
+    if not TELEGRAM_TOKEN:
+        raise ValueError("TELEGRAM_TOKEN is not set")
+    
+    logger.info("Starting bot thread...")
+    bot_thread = threading.Thread(target=run_bot_loop, daemon=True)
+    bot_thread.start()
+    
+    # Wait for bot to initialize
+    import time
+    for _ in range(10):
+        if telegram_app is not None:
+            break
+        time.sleep(1)
+    
+    if telegram_app is None:
+        raise RuntimeError("Bot failed to initialize")
+    
+    logger.info("Bot thread started successfully")
 
 
 @app.route('/')
@@ -225,22 +250,23 @@ def health():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """Telegram webhook endpoint"""
-    global telegram_app
+    global telegram_app, bot_loop
     
-    if telegram_app is None:
+    if telegram_app is None or bot_loop is None:
         return jsonify({"error": "Bot not initialized"}), 503
     
     try:
         # Get update JSON
         update_json = request.get_json(force=True)
         
-        # Process update
+        # Process update in bot's event loop
         async def process_update_async():
             update = Update.de_json(update_json, telegram_app.bot)
             await telegram_app.process_update(update)
         
-        # Run in new event loop
-        asyncio.run(process_update_async())
+        # Schedule in bot's event loop (don't create new loop!)
+        future = asyncio.run_coroutine_threadsafe(process_update_async(), bot_loop)
+        future.result(timeout=5)  # Wait max 5 seconds
         
         return jsonify({"ok": True})
     
