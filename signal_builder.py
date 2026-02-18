@@ -60,6 +60,7 @@ class SignalBuilder:
         }
 
         return {
+            "symbol": ai_pick["pair"],  # Unified naming
             "pair": ai_pick["pair"],
             "direction": ai_pick["direction"],
             "entry_price": market_price,

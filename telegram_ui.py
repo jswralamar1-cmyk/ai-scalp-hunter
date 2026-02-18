@@ -121,20 +121,8 @@ class TelegramUI:
     async def _send_signal(self, update: Update, signal: dict):
         """Send a single trading signal with chart"""
         try:
-            # Build signal message
-            direction_emoji = "🟢" if signal["direction"] == "BUY" else "🔴"
-            
-            message = (
-                f"{direction_emoji} *إشارة {signal['direction']}*\n\n"
-                f"💱 الزوج: `{signal['symbol']}`\n"
-                f"📍 الدخول: `{signal['entry_price']:.5f}`\n"
-                f"🎯 الهدف: `{signal['tp']:.5f}`\n"
-                f"🛑 الإيقاف: `{signal['sl']:.5f}`\n"
-                f"⏱ الصلاحية: {signal['expiry_minutes']} دقيقة\n\n"
-                f"📊 النقاط: {signal['score']}/100\n"
-                f"🔥 الثقة: {signal['confidence']}\n\n"
-                f"💡 *التحليل:*\n{signal['reasoning']}"
-            )
+            # Use pre-built message from signal_builder (Clean Architecture)
+            message = signal.get("message", "⚠️ Signal formatting error")
             
             # Send chart if available
             if signal.get("chart_path"):
