@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+.env
+*.log
+
+# Charts
+*.png
+temp_*.png
+
+# IDE
+.vscode/
+.idea/
+
+# System
+.DS_Store
