@@ -66,8 +66,17 @@ class DataFetcher:
 
                         try:
                             data = await response.json()
+                            # 🔥 DEBUG: طباعة الرد الحقيقي
+                            if attempt == 0:  # فقط في المحاولة الأولى
+                                print(f"🔍 TwelveData response for {symbol}: {str(data)[:500]}")
                         except Exception as json_err:
                             print(f"⚠️ JSON parse error for {symbol}: {json_err}")
+                            # طباعة raw response
+                            try:
+                                raw_text = await response.text()
+                                print(f"🔍 Raw response: {raw_text[:500]}")
+                            except:
+                                pass
                             if attempt == 2:
                                 return None
                             await asyncio.sleep(2)
@@ -93,7 +102,8 @@ class DataFetcher:
                         
                         # 🔥 التحقق من وجود "values"
                         if "values" not in data:
-                            print(f"⚠️ TwelveData: no 'values' in response for {symbol}: {data.get('status', 'unknown')}")
+                            print(f"⚠️ TwelveData: no 'values' in response for {symbol}")
+                            print(f"🔍 Full response: {data}")
                             if "code" in data:
                                 print(f"⚠️ TwelveData error code: {data['code']} - {data.get('message', '')}")
                             if attempt == 2:
