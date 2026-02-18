@@ -45,6 +45,7 @@ class DataFetcher:
                             return None
 
                         data = await resp.json()
+                        print(f"🔍 TwelveData response for {symbol}: {data}")  # 🔥 DEBUG
 
                         if "values" not in data:
                             print(f"⚠️ No 'values' in response for {symbol} {interval}")
