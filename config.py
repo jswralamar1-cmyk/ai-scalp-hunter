@@ -11,7 +11,7 @@ load_dotenv()
 # ====================================================
 # 🔐 APIs
 # ====================================================
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("TELEGRAM_TOKEN")
 TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
